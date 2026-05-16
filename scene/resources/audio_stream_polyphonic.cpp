@@ -253,6 +253,7 @@ AudioStreamPlaybackPolyphonic::ID AudioStreamPlaybackPolyphonic::play_stream(con
 				sp->volume_vector.write[2] = AudioFrame(linear_volume, linear_volume);
 				sp->volume_vector.write[3] = AudioFrame(linear_volume, linear_volume);
 				sp->bus = p_bus;
+				sp->pitch_scale = p_pitch_scale;
 
 				if (streams[i].stream_playback->get_sample_playback().is_valid()) {
 					AudioServer::get_singleton()->stop_playback_stream(streams[i].stream_playback);
@@ -313,6 +314,14 @@ void AudioStreamPlaybackPolyphonic::set_stream_pitch_scale(ID p_stream_id, float
 		return;
 	}
 	s->pitch_scale = p_pitch_scale;
+	// Web uses PLAYBACK_TYPE_SAMPLE, which bypasses the engine mixer entirely —
+	// pitch must be forwarded to the platform audio driver explicitly.
+	if (s->stream_playback.is_valid() && s->stream_playback->get_is_sample()) {
+		Ref<AudioSamplePlayback> sample_playback = s->stream_playback->get_sample_playback();
+		if (sample_playback.is_valid()) {
+			AudioServer::get_singleton()->update_sample_playback_pitch_scale(sample_playback, p_pitch_scale);
+		}
+	}
 }
 
 bool AudioStreamPlaybackPolyphonic::is_stream_playing(ID p_stream_id) const {
