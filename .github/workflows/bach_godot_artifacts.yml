@@ -1,0 +1,148 @@
+name: bach-godot artifacts
+# Independent of runner.yml — no needs: static-checks, so the
+# DISABLE_GODOT_CI repo variable does not suppress this workflow.
+# Produces artifacts that bach-godot's deploy CI downloads instead
+# of compiling the fork from source.
+on:
+  push:
+    branches: [bach-4.6]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-editor:
+    name: 🐧 Linux editor (non-mono)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    env:
+      SCONS_FLAGS: >-
+        dev_mode=yes
+        module_text_server_fb_enabled=yes
+        "accesskit_sdk_path=${{ github.workspace }}/accesskit-c-0.21.2/"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwayland-bin
+
+      - name: Free disk space on runner
+        run: |
+          echo "Disk usage before:" && df -h
+          sudo rm -rf /usr/local/lib/android
+          echo "Disk usage after:" && df -h
+
+      - name: Restore Godot build cache
+        uses: ./.github/actions/godot-cache-restore
+        with:
+          cache-name: bach-linux-editor
+        continue-on-error: true
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Download pre-built AccessKit
+        uses: dsaltares/fetch-gh-release-asset@1.1.2
+        with:
+          repo: godotengine/godot-accesskit-c-static
+          version: tags/0.21.2
+          file: accesskit-c-0.21.2.zip
+          target: accesskit-c-0.21.2/accesskit_c.zip
+
+      - name: Extract pre-built AccessKit
+        run: unzip -o accesskit-c-0.21.2/accesskit_c.zip
+
+      - name: Compile linux editor
+        uses: ./.github/actions/godot-build
+        with:
+          scons-flags: ${{ env.SCONS_FLAGS }}
+          platform: linuxbsd
+          target: editor
+
+      - name: Save Godot build cache
+        uses: ./.github/actions/godot-cache-save
+        with:
+          cache-name: bach-linux-editor
+        continue-on-error: true
+
+      - name: Prepare artifact (strip + chmod)
+        run: |
+          strip bin/godot.*
+          chmod +x bin/godot.*
+
+      - name: Upload linux-editor artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: linux-editor
+          path: bin/godot.linuxbsd.editor.x86_64
+
+  web-templates:
+    name: 🌐 Web templates (nothreads, release + debug)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      EM_VERSION: 4.0.11
+      # Mirrors web_builds.yml:9-13 (the upstream's web template flags),
+      # with threads=no added per scons invocation below.
+      SCONS_FLAGS: >-
+        dev_mode=yes
+        tests=no
+        debug_symbols=no
+        use_closure_compiler=yes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up Emscripten ${{ env.EM_VERSION }}
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: ${{ env.EM_VERSION }}
+          no-cache: true
+
+      - name: Verify Emscripten setup
+        run: emcc -v
+
+      - name: Restore Godot build cache
+        uses: ./.github/actions/godot-cache-restore
+        with:
+          cache-name: bach-web-nothreads
+        continue-on-error: true
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Compile web template_release (nothreads)
+        uses: ./.github/actions/godot-build
+        with:
+          scons-flags: ${{ env.SCONS_FLAGS }} threads=no
+          platform: web
+          target: template_release
+
+      - name: Compile web template_debug (nothreads)
+        uses: ./.github/actions/godot-build
+        with:
+          scons-flags: ${{ env.SCONS_FLAGS }} threads=no
+          platform: web
+          target: template_debug
+
+      - name: Save Godot build cache
+        uses: ./.github/actions/godot-cache-save
+        with:
+          cache-name: bach-web-nothreads
+        continue-on-error: true
+
+      - name: Upload web-nothreads-template artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: web-nothreads-template
+          path: |
+            bin/godot.web.template_release.wasm32.nothreads.zip
+            bin/godot.web.template_debug.wasm32.nothreads.zip
