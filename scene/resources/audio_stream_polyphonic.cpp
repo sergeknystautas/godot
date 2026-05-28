@@ -317,9 +317,9 @@ void AudioStreamPlaybackPolyphonic::set_stream_pitch_scale(ID p_stream_id, float
 	// Web uses PLAYBACK_TYPE_SAMPLE, which bypasses the engine mixer entirely —
 	// pitch must be forwarded to the platform audio driver explicitly.
 	if (s->stream_playback.is_valid() && s->stream_playback->get_is_sample()) {
-		Ref<AudioSamplePlayback> sample_playback = s->stream_playback->get_sample_playback();
-		if (sample_playback.is_valid()) {
-			AudioServer::get_singleton()->update_sample_playback_pitch_scale(sample_playback, p_pitch_scale);
+		Ref<AudioSamplePlayback> sp = s->stream_playback->get_sample_playback();
+		if (sp.is_valid()) {
+			AudioServer::get_singleton()->update_sample_playback_pitch_scale(sp, p_pitch_scale);
 		}
 	}
 }
