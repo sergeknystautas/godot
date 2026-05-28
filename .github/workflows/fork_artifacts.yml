@@ -1,7 +1,7 @@
-name: bach-godot artifacts
+name: fork artifacts
 # Independent of runner.yml — no needs: static-checks, so the
 # DISABLE_GODOT_CI repo variable does not suppress this workflow.
-# Produces artifacts that bach-godot's deploy CI downloads instead
+# Produces artifacts for downstream consumers to download instead
 # of compiling the fork from source.
 on:
   push:
@@ -41,7 +41,7 @@ jobs:
       - name: Restore Godot build cache
         uses: ./.github/actions/godot-cache-restore
         with:
-          cache-name: bach-linux-editor
+          cache-name: linux-editor
         continue-on-error: true
 
       - name: Setup Python and SCons
@@ -68,7 +68,7 @@ jobs:
       - name: Save Godot build cache
         uses: ./.github/actions/godot-cache-save
         with:
-          cache-name: bach-linux-editor
+          cache-name: linux-editor
         continue-on-error: true
 
       - name: Prepare artifact (strip + chmod)
@@ -113,7 +113,7 @@ jobs:
       - name: Restore Godot build cache
         uses: ./.github/actions/godot-cache-restore
         with:
-          cache-name: bach-web-nothreads
+          cache-name: web-nothreads
         continue-on-error: true
 
       - name: Setup Python and SCons
@@ -136,7 +136,7 @@ jobs:
       - name: Save Godot build cache
         uses: ./.github/actions/godot-cache-save
         with:
-          cache-name: bach-web-nothreads
+          cache-name: web-nothreads
         continue-on-error: true
 
       - name: Upload web-nothreads-template artifact
