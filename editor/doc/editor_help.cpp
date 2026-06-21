@@ -35,6 +35,7 @@
 #include "core/extension/gdextension.h"
 #include "core/input/input.h"
 #include "core/io/json.h"
+#include "core/object/message_queue.h"
 #include "core/object/script_language.h"
 #include "core/os/keyboard.h"
 #include "core/string/string_builder.h"
@@ -3375,6 +3376,11 @@ void EditorHelp::update_doc() {
 
 void EditorHelp::cleanup_doc() {
 	_wait_for_thread();
+	// The worker thread's last act is to call_deferred() doc-generation onto the
+	// message queue (e.g. _gen_extensions_docs). Joining the thread does not drain
+	// that posted call, so flush it now — while doc is still alive — before freeing.
+	// Otherwise Main::cleanup's final flush runs it against a deleted doc and crashes.
+	MessageQueue::get_singleton()->flush();
 	memdelete(doc);
 	doc = nullptr;
 }
