@@ -19,6 +19,8 @@ jobs:
     env:
       SCONS_FLAGS: >-
         dev_mode=yes
+        debug_symbols=yes
+        separate_debug_symbols=yes
         module_text_server_fb_enabled=yes
         "accesskit_sdk_path=${{ github.workspace }}/accesskit-c-0.21.2/"
     steps:
@@ -71,16 +73,26 @@ jobs:
           cache-name: linux-editor
         continue-on-error: true
 
-      - name: Prepare artifact (strip + chmod)
-        run: |
-          strip bin/godot.*
-          chmod +x bin/godot.*
+      - name: Prepare artifact (chmod)
+        # The binary is already stripped by scons' separate_debug_symbols
+        # post-action (objcopy --only-keep-debug; strip; --add-gnu-debuglink),
+        # which also wrote bin/godot.linuxbsd.editor.x86_64.debugsymbols.
+        # Don't strip again here — a glob would also clobber the sidecar.
+        run: chmod +x bin/godot.linuxbsd.editor.x86_64
 
       - name: Upload linux-editor artifact
         uses: ./.github/actions/upload-artifact
         with:
           name: linux-editor
           path: bin/godot.linuxbsd.editor.x86_64
+
+      - name: Upload linux-editor debug symbols
+        # Separate artifact so normal consumers download only the small
+        # stripped binary; pull this to addr2line a crash backtrace.
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: linux-editor-debugsymbols
+          path: bin/godot.linuxbsd.editor.x86_64.debugsymbols
 
   web-templates:
     name: 🌐 Web templates (nothreads, release + debug)
