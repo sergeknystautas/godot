@@ -94,6 +94,72 @@ jobs:
           name: linux-editor-debugsymbols
           path: bin/godot.linuxbsd.editor.x86_64.debugsymbols
 
+  macos-editor:
+    name: 🍎 macOS editor (arm64)
+    runs-on: macos-latest
+    timeout-minutes: 120
+    env:
+      SCONS_FLAGS: >-
+        dev_mode=yes
+        module_text_server_fb_enabled=yes
+        "accesskit_sdk_path=${{ github.workspace }}/accesskit-c-0.21.2/"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
+
+      - name: Restore Godot build cache
+        uses: ./.github/actions/godot-cache-restore
+        with:
+          cache-name: macos-editor
+        continue-on-error: true
+
+      - name: Setup Python and SCons
+        uses: ./.github/actions/godot-deps
+
+      - name: Download pre-built AccessKit
+        uses: dsaltares/fetch-gh-release-asset@1.1.2
+        with:
+          repo: godotengine/godot-accesskit-c-static
+          version: tags/0.21.2
+          file: accesskit-c-0.21.2.zip
+          target: accesskit-c-0.21.2/accesskit_c.zip
+
+      - name: Extract pre-built AccessKit
+        run: unzip -o accesskit-c-0.21.2/accesskit_c.zip
+
+      # arm64-only + vulkan=no on purpose: the only consumer is bach-godot's
+      # headless coverage diagnostics, which never opens a window. Skipping the
+      # x86_64 cross-compile/lipo and the Vulkan SDK install keeps this job
+      # self-contained instead of dragging in upstream's macos_builds machinery.
+      - name: Compile macos editor (arm64)
+        uses: ./.github/actions/godot-build
+        with:
+          scons-flags: ${{ env.SCONS_FLAGS }} arch=arm64 vulkan=no
+          platform: macos
+          target: editor
+
+      - name: Save Godot build cache
+        uses: ./.github/actions/godot-cache-save
+        with:
+          cache-name: macos-editor
+        continue-on-error: true
+
+      - name: Prepare artifact
+        run: |
+          strip bin/godot.macos.editor.arm64
+          chmod +x bin/godot.macos.editor.arm64
+
+      - name: Upload macos-editor artifact
+        uses: ./.github/actions/upload-artifact
+        with:
+          name: macos-editor
+          path: bin/godot.macos.editor.arm64
+
   web-templates:
     name: 🌐 Web templates (nothreads, release + debug)
     runs-on: ubuntu-24.04
